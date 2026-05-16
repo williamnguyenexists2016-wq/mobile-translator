@@ -1,107 +1,98 @@
-# Graphical Scratch-style Translator
-# Install required libraries first:
-#   pip3 install deep-translator gtts SpeechRecognition --break-system-packages
-#   sudo apt install mpg123 python3-pyaudio portaudio19-dev python3-tk
+# Pocket Translator — Kivy Android App
+# Uses plyer for TTS (Android native)
 
-import tkinter as tk
-from tkinter import ttk, messagebox
+from kivy.app import App
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.label import Label
+from kivy.uix.textinput import TextInput
+from kivy.uix.button import Button
+from kivy.uix.spinner import Spinner
+from kivy.core.window import Window
+from kivy.utils import get_color_from_hex
+from kivy.clock import Clock
 import threading
-import tempfile
-import os
 
 # ── Language data ────────────────────────────────────────────────────────────
 
 LANGUAGES = {
-    "English": "en",
-    "Arabic":     "ar",
-    "Belarusian": "be",
-    "Chinese (Simplified)":    "zh-CN",
-    "Dutch":      "nl",
+    "English":               "en",
+    "Arabic":                "ar",
+    "Belarusian":            "be",
+    "Bengali":               "bn",
+    "Bulgarian":             "bg",
+    "Catalan":               "ca",
+    "Chinese (Simplified)":  "zh-CN",
     "Chinese (Traditional)": "zh-TW",
-    "French":     "fr",
-    "German":     "de",
-    "Greek":      "el",
-    "Hindi":      "hi",
-    "Italian":    "it",
-    "Japanese":   "ja",
-    "Korean":     "ko",
-    "Polish":     "pl",
-    "Portuguese": "pt",
-    "Russian":    "ru",
-    "Spanish":    "es",
-    "Swedish":    "sv",
-    "Turkish":    "tr",
-    "Ukrainian":  "uk",
-    "Vietnamese": "vi",
-    "Romanian": "ro",
-    "Scottish Gaelic": "gd",
-    "Scottish": "gd",
-    "Malay": "ms",
-    "Indonesian": "id",
-    "Indo": "id",
-    "Thai": "th",
-    "Hebrew": "he",
-    "Persian": "fa",
-    "Farsi": "fa",
-    "Bengali": "bn",
-    "Tamil": "ta",
-    "Urdu": "ur",
-    "Swahili" : "sw",
-   "Filipino": "tl",
-    "Tagalog": "tl",
-   "Croatian": "hr",
-   "Czech": "cs",
-   "Slovak": "sk",
-   "Finnish": "fi",
-   "Danish" : "da",
-   "Norwegian": "no",
-   "Bulgarian": "bg",
-   "Serbian": "sr",
-   "Catalan": "ca",
+    "Croatian":              "hr",
+    "Czech":                 "cs",
+    "Danish":                "da",
+    "Dutch":                 "nl",
+    "Farsi":                 "fa",
+    "Filipino":              "tl",
+    "Finnish":               "fi",
+    "French":                "fr",
+    "German":                "de",
+    "Greek":                 "el",
+    "Hebrew":                "he",
+    "Hindi":                 "hi",
+    "Indonesian":            "id",
+    "Italian":               "it",
+    "Japanese":              "ja",
+    "Korean":                "ko",
+    "Malay":                 "ms",
+    "Norwegian":             "no",
+    "Polish":                "pl",
+    "Portuguese":            "pt",
+    "Romanian":              "ro",
+    "Russian":               "ru",
+    "Scottish Gaelic":       "gd",
+    "Serbian":               "sr",
+    "Slovak":                "sk",
+    "Spanish":               "es",
+    "Swahili":               "sw",
+    "Swedish":               "sv",
+    "Tagalog":               "tl",
+    "Tamil":                 "ta",
+    "Thai":                  "th",
+    "Turkish":               "tr",
+    "Ukrainian":             "uk",
+    "Urdu":                  "ur",
+    "Vietnamese":            "vi",
 }
 
-# Languages gTTS doesn't support
-NO_TTS = {"be", "gd", "la"}
+NO_TTS = {"be", "gd"}
+LANG_NAMES = sorted(LANGUAGES.keys())
 
-# ── Colours & fonts ──────────────────────────────────────────────────────────
+# ── Colours ──────────────────────────────────────────────────────────────────
 
-BG        = "#0f1117"
-PANEL     = "#1a1d27"
-ACCENT    = "#4f8ef7"
-ACCENT2   = "#a259ff"
-TEXT      = "#e8eaf0"
-SUBTEXT   = "#7b8099"
-SUCCESS   = "#3ddba0"
-ERROR     = "#ff5f6d"
-BORDER    = "#2a2d3e"
+BG      = "#0f1117"
+PANEL   = "#1a1d27"
+ACCENT  = "#4f8ef7"
+TEXT    = "#e8eaf0"
+SUBTEXT = "#7b8099"
+SUCCESS = "#3ddba0"
+ERROR   = "#ff5f6d"
 
-FONT_TITLE  = ("Georgia", 22, "bold")
-FONT_LABEL  = ("Georgia", 10)
-FONT_INPUT  = ("Courier", 13)
-FONT_BTN    = ("Georgia", 11, "bold")
-FONT_SMALL  = ("Georgia", 9)
+Window.clearcolor = get_color_from_hex(BG)
 
-# ── Helper functions ─────────────────────────────────────────────────────────
+# ── Helpers ──────────────────────────────────────────────────────────────────
 
 def speak(text, lang_code):
     if lang_code in NO_TTS:
         return False
     try:
-        from gtts import gTTS
-        tts = gTTS(text=text, lang=lang_code)
-        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
-            tmp = f.name
-        tts.save(tmp)
-        os.system(f"mpg123 -q {tmp}")
-        os.remove(tmp)
+        from plyer import tts
+        tts.speak(text)
         return True
     except Exception:
         return False
 
-def do_translate(text, lang_name):
+def do_translate(text, to_lang, from_lang="Auto Detect"):
     from deep_translator import GoogleTranslator
-    code = LANGUAGES[lang_name]
-    return GoogleTranslator(source="auto", target=code).translate(text), code
+    to_code   = LANGUAGES[to_lang]
+    from_code = "auto" if from_lang == "Auto Detect" else LANGUAGES[from_lang]
+    result = GoogleTranslator(source=from_code, target=to_code).translate(text)
+    return result, to_code
 
 def do_listen():
     import speech_recognition as sr
@@ -111,191 +102,201 @@ def do_listen():
         audio = r.listen(source, timeout=6)
     return r.recognize_google(audio)
 
-# ── Main App ─────────────────────────────────────────────────────────────────
+# ── App ───────────────────────────────────────────────────────────────────────
 
-class TranslatorApp:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Translator")
-        self.root.configure(bg=BG)
-        self.root.resizable(False, False)
-        self.root.geometry("680x560")
+class TranslatorApp(App):
+    def build(self):
+        self.last_result = None
+        self.last_code   = None
 
-        self._build_ui()
+        root = BoxLayout(orientation="vertical", padding=16, spacing=12)
 
-    def _build_ui(self):
-        # ── Title bar ──
-        title_frame = tk.Frame(self.root, bg=BG)
-        title_frame.pack(fill="x", padx=30, pady=(24, 0))
+        root.add_widget(Label(
+            text="✦ Translator",
+            font_size="24sp",
+            bold=True,
+            color=get_color_from_hex(TEXT),
+            size_hint_y=None,
+            height=40,
+        ))
+        root.add_widget(Label(
+            text="powered by Google",
+            font_size="11sp",
+            color=get_color_from_hex(SUBTEXT),
+            size_hint_y=None,
+            height=20,
+        ))
 
-        tk.Label(title_frame, text="✦ Translator", font=FONT_TITLE,
-                 bg=BG, fg=TEXT).pack(side="left")
+        root.add_widget(Label(
+            text="TEXT TO TRANSLATE",
+            font_size="10sp",
+            color=get_color_from_hex(SUBTEXT),
+            size_hint_y=None,
+            height=20,
+        ))
 
-        tk.Label(title_frame, text="powered by Google",
-                 font=FONT_SMALL, bg=BG, fg=SUBTEXT).pack(side="left", padx=(10,0), pady=(8,0))
+        self.input_box = TextInput(
+            hint_text="Type here...",
+            multiline=True,
+            size_hint_y=None,
+            height=120,
+            background_color=get_color_from_hex(PANEL),
+            foreground_color=get_color_from_hex(TEXT),
+            cursor_color=get_color_from_hex(ACCENT),
+            font_size="14sp",
+            padding=[12, 8],
+        )
+        root.add_widget(self.input_box)
 
-        # ── Input panel ──
-        in_frame = tk.Frame(self.root, bg=PANEL, bd=0, highlightthickness=1,
-                            highlightbackground=BORDER)
-        in_frame.pack(fill="x", padx=30, pady=(18, 0))
+        lang_row = BoxLayout(orientation="horizontal",
+                             size_hint_y=None, height=44, spacing=8)
 
-        tk.Label(in_frame, text="TEXT TO TRANSLATE", font=FONT_SMALL,
-                 bg=PANEL, fg=SUBTEXT).pack(anchor="w", padx=14, pady=(10,2))
+        self.from_spinner = Spinner(
+            text="Auto Detect",
+            values=["Auto Detect"] + LANG_NAMES,
+            background_color=get_color_from_hex(PANEL),
+            color=get_color_from_hex(TEXT),
+            font_size="13sp",
+        )
+        lang_row.add_widget(self.from_spinner)
 
-        self.input_box = tk.Text(in_frame, height=4, font=FONT_INPUT,
-                                 bg=PANEL, fg=TEXT, insertbackground=ACCENT,
-                                 relief="flat", padx=12, pady=8,
-                                 wrap="word", bd=0)
-        self.input_box.pack(fill="x", padx=4, pady=(0,4))
-        self.input_box.bind("<Control-Return>", lambda e: self._translate())
+        lang_row.add_widget(Label(
+            text="→", color=get_color_from_hex(SUBTEXT),
+            size_hint_x=None, width=24,
+        ))
 
-        # ── Controls row ──
-        ctrl = tk.Frame(self.root, bg=BG)
-        ctrl.pack(fill="x", padx=30, pady=(14, 0))
+        self.to_spinner = Spinner(
+            text="Spanish",
+            values=LANG_NAMES,
+            background_color=get_color_from_hex(PANEL),
+            color=get_color_from_hex(TEXT),
+            font_size="13sp",
+        )
+        lang_row.add_widget(self.to_spinner)
+        root.add_widget(lang_row)
 
-        # Language dropdown
-        tk.Label(ctrl, text="LANGUAGE", font=FONT_SMALL,
-                 bg=BG, fg=SUBTEXT).pack(side="left")
+        btn_row = BoxLayout(orientation="horizontal",
+                            size_hint_y=None, height=48, spacing=8)
 
-        self.lang_var = tk.StringVar(value="Spanish")
-        lang_menu = ttk.Combobox(ctrl, textvariable=self.lang_var,
-                                 values=sorted(LANGUAGES.keys()),
-                                 state="readonly", width=16,
-                                 font=FONT_LABEL)
-        lang_menu.pack(side="left", padx=(8, 20))
+        self.translate_btn = Button(
+            text="Translate  →",
+            background_color=get_color_from_hex(ACCENT),
+            color=get_color_from_hex(TEXT),
+            font_size="14sp", bold=True,
+        )
+        self.translate_btn.bind(on_press=self.on_translate)
+        btn_row.add_widget(self.translate_btn)
 
-        # Style the combobox
-        style = ttk.Style()
-        style.theme_use("clam")
-        style.configure("TCombobox",
-                        fieldbackground=PANEL,
-                        background=PANEL,
-                        foreground=TEXT,
-                        selectbackground=ACCENT,
-                        selectforeground=TEXT,
-                        bordercolor=BORDER,
-                        arrowcolor=ACCENT)
+        self.mic_btn = Button(
+            text="🎤 Dictate",
+            background_color=get_color_from_hex(PANEL),
+            color=get_color_from_hex(TEXT),
+            font_size="14sp",
+        )
+        self.mic_btn.bind(on_press=self.on_dictate)
+        btn_row.add_widget(self.mic_btn)
+        root.add_widget(btn_row)
 
-        # Buttons
-        self.translate_btn = tk.Button(ctrl, text="Translate  →",
-                                       font=FONT_BTN, bg=ACCENT, fg="white",
-                                       relief="flat", padx=18, pady=7,
-                                       cursor="hand2",
-                                       activebackground=ACCENT2,
-                                       activeforeground="white",
-                                       command=self._translate)
-        self.translate_btn.pack(side="left")
+        out_header = BoxLayout(orientation="horizontal",
+                               size_hint_y=None, height=30)
+        out_header.add_widget(Label(
+            text="TRANSLATION", font_size="10sp",
+            color=get_color_from_hex(SUBTEXT),
+        ))
+        self.speak_btn = Button(
+            text="🔊 Speak",
+            background_color=get_color_from_hex(PANEL),
+            color=get_color_from_hex(ACCENT),
+            font_size="11sp", size_hint_x=None, width=90,
+        )
+        self.speak_btn.bind(on_press=self.on_speak)
+        out_header.add_widget(self.speak_btn)
+        root.add_widget(out_header)
 
-        self.mic_btn = tk.Button(ctrl, text="🎤 Dictate",
-                                 font=FONT_BTN, bg=PANEL, fg=TEXT,
-                                 relief="flat", padx=14, pady=7,
-                                 cursor="hand2",
-                                 highlightthickness=1,
-                                 highlightbackground=BORDER,
-                                 activebackground=BORDER,
-                                 activeforeground=TEXT,
-                                 command=self._dictate)
-        self.mic_btn.pack(side="left", padx=(10,0))
+        self.output_box = TextInput(
+            hint_text="Translation appears here...",
+            multiline=True, readonly=True,
+            size_hint_y=None, height=140,
+            background_color=get_color_from_hex(PANEL),
+            foreground_color=get_color_from_hex(SUCCESS),
+            font_size="14sp", padding=[12, 8],
+        )
+        root.add_widget(self.output_box)
 
-        # ── Output panel ──
-        out_frame = tk.Frame(self.root, bg=PANEL, bd=0, highlightthickness=1,
-                             highlightbackground=BORDER)
-        out_frame.pack(fill="both", expand=True, padx=30, pady=(18, 0))
+        self.status_label = Label(
+            text="Ready  ✦", font_size="11sp",
+            color=get_color_from_hex(SUBTEXT),
+            size_hint_y=None, height=24,
+        )
+        root.add_widget(self.status_label)
 
-        out_top = tk.Frame(out_frame, bg=PANEL)
-        out_top.pack(fill="x", padx=14, pady=(10, 2))
+        return root
 
-        tk.Label(out_top, text="TRANSLATION", font=FONT_SMALL,
-                 bg=PANEL, fg=SUBTEXT).pack(side="left")
+    def set_status(self, text):
+        Clock.schedule_once(lambda dt: setattr(self.status_label, "text", text))
 
-        self.speak_btn = tk.Button(out_top, text="🔊 Speak",
-                                   font=FONT_SMALL, bg=PANEL, fg=ACCENT,
-                                   relief="flat", cursor="hand2",
-                                   activebackground=PANEL,
-                                   activeforeground=ACCENT2,
-                                   command=self._speak_result)
-        self.speak_btn.pack(side="right")
-
-        self.output_box = tk.Text(out_frame, height=6, font=FONT_INPUT,
-                                  bg=PANEL, fg=SUCCESS, insertbackground=ACCENT,
-                                  relief="flat", padx=12, pady=8,
-                                  wrap="word", bd=0, state="disabled")
-        self.output_box.pack(fill="both", expand=True, padx=4, pady=(0,4))
-
-        # ── Status bar ──
-        self.status_var = tk.StringVar(value="Ready  ✦")
-        tk.Label(self.root, textvariable=self.status_var, font=FONT_SMALL,
-                 bg=BG, fg=SUBTEXT).pack(anchor="w", padx=30, pady=(10, 16))
-
-        self._last_code = None
-
-    # ── Actions ──────────────────────────────────────────────────────────────
-
-    def _set_output(self, text, color=None):
-        self.output_box.configure(state="normal")
-        self.output_box.delete("1.0", "end")
-        self.output_box.insert("1.0", text)
-        if color:
-            self.output_box.configure(fg=color)
-        self.output_box.configure(state="disabled")
-
-    def _translate(self):
-        text = self.input_box.get("1.0", "end").strip()
+    def on_translate(self, instance):
+        text = self.input_box.text.strip()
         if not text:
-            self.status_var.set("⚠  Please enter some text first.")
+            self.set_status("⚠  Please enter some text first.")
             return
-        lang = self.lang_var.get()
-        self.status_var.set(f"Translating to {lang}...")
-        self.translate_btn.configure(state="disabled")
+
+        to_lang   = self.to_spinner.text
+        from_lang = self.from_spinner.text
+
+        self.translate_btn.disabled = True
+        self.set_status(f"Translating to {to_lang}...")
 
         def run():
             try:
-                result, code = do_translate(text, lang)
-                self._last_code = code
-                self._last_result = result
-                self._set_output(result, SUCCESS)
-                self.status_var.set(f"✓  Translated to {lang}")
-                # Auto-speak
-                if code not in NO_TTS:
-                    threading.Thread(target=speak, args=(result, code), daemon=True).start()
+                result, code = do_translate(text, to_lang, from_lang)
+                self.last_result = result
+                self.last_code   = code
+                Clock.schedule_once(lambda dt: setattr(self.output_box, "text", result))
+                Clock.schedule_once(lambda dt: setattr(
+                    self.output_box, "foreground_color", get_color_from_hex(SUCCESS)))
+                if code in NO_TTS:
+                    self.set_status(f"✓  Translated  (TTS not available for {to_lang})")
                 else:
-                    self.status_var.set(f"✓  Translated to {lang}  (TTS not available)")
-            except Exception as e:
-                self._set_output(str(e), ERROR)
-                self.status_var.set("✗  Translation failed.")
+                    self.set_status(f"✓  Translated to {to_lang}")
+                    threading.Thread(target=speak, args=(result, code), daemon=True).start()
+            except Exception as ex:
+                Clock.schedule_once(lambda dt: setattr(self.output_box, "text", str(ex)))
+                Clock.schedule_once(lambda dt: setattr(
+                    self.output_box, "foreground_color", get_color_from_hex(ERROR)))
+                self.set_status("✗  Translation failed.")
             finally:
-                self.translate_btn.configure(state="normal")
+                Clock.schedule_once(lambda dt: setattr(self.translate_btn, "disabled", False))
 
         threading.Thread(target=run, daemon=True).start()
 
-    def _speak_result(self):
-        if not hasattr(self, "_last_result") or not self._last_result:
-            return
-        if self._last_code in NO_TTS:
-            self.status_var.set("⚠  TTS not available for this language.")
-            return
-        self.status_var.set("🔊 Speaking...")
-        threading.Thread(target=speak, args=(self._last_result, self._last_code), daemon=True).start()
+    def on_speak(self, instance):
+        if self.last_result and self.last_code not in NO_TTS:
+            self.set_status("🔊 Speaking...")
+            threading.Thread(target=speak,
+                             args=(self.last_result, self.last_code),
+                             daemon=True).start()
+        elif self.last_code in NO_TTS:
+            self.set_status("⚠  TTS not available for this language.")
 
-    def _dictate(self):
-        self.status_var.set("🎤 Listening... speak now!")
-        self.mic_btn.configure(state="disabled", text="🎤 Listening...")
+    def on_dictate(self, instance):
+        self.mic_btn.disabled = True
+        self.mic_btn.text = "🎤 Listening..."
+        self.set_status("🎤 Listening... speak now!")
 
         def run():
             try:
                 text = do_listen()
-                self.input_box.delete("1.0", "end")
-                self.input_box.insert("1.0", text)
-                self.status_var.set(f"✓  Heard: {text}")
-            except Exception as e:
-                self.status_var.set(f"✗  Dictation failed: {e}")
+                Clock.schedule_once(lambda dt: setattr(self.input_box, "text", text))
+                self.set_status(f"✓  Heard: {text}")
+            except Exception as ex:
+                self.set_status(f"✗  Dictation failed: {ex}")
             finally:
-                self.mic_btn.configure(state="normal", text="🎤 Dictate")
+                Clock.schedule_once(lambda dt: setattr(self.mic_btn, "disabled", False))
+                Clock.schedule_once(lambda dt: setattr(self.mic_btn, "text", "🎤 Dictate"))
 
         threading.Thread(target=run, daemon=True).start()
 
-# ── Run ───────────────────────────────────────────────────────────────────────
 
-root = tk.Tk()
-app = TranslatorApp(root)
-root.mainloop()
+if __name__ == "__main__":
+    TranslatorApp().run()
