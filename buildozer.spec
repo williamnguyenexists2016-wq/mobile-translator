@@ -12,6 +12,9 @@ android.permissions = INTERNET, RECORD_AUDIO
 android.api = 33
 android.minapi = 21
 android.archs = arm64-v8a, armeabi-v7a
+android.accept_sdk_license = True
+android.sdk_path = /home/runner/.buildozer/android/platform/android-sdk
+android.ndk_path = /home/runner/.buildozer/android/platform/android-ndk-r28c
 
 [buildozer]
 log_level = 2
